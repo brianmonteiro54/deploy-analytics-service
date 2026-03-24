@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  namespace: togglemaster-analytics
+  labels:
+    app.kubernetes.io/name: analytics-service
+    app.kubernetes.io/component: analytics
+    app.kubernetes.io/part-of: togglemaster
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: analytics-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: analytics-service
+        app.kubernetes.io/component: analytics
+        app.kubernetes.io/part-of: togglemaster
+    spec:
+      containers:
+        - name: analytics-service
+          image: 420414435435.dkr.ecr.us-east-1.amazonaws.com/togglemaster/targeting-service:fff170adca091a6e22750111f189a4e5e05da41f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8005
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8005"
+            - name: APP_ENV
+              value: "production"
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: AWS_SQS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-service-config
+                  key: SQS_QUEUE_URL
+            - name: AWS_DYNAMODB_TABLE
+              valueFrom:
+                secretKeyRef:
+                  name: analytics-service-config
+                  key: DYNAMODB_TABLE
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret-access-key
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: session-token
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 512Mi
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
